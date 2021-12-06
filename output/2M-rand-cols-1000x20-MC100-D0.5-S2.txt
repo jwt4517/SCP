@@ -1,0 +1,4 @@
+Number of sets: 8
+Total cost: 193
+1 4 5 6 8 17 18 20 
+10.1982 s

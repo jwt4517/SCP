@@ -61,6 +61,8 @@ int main () {
 	const int TRIALS_PER_LEVEL = 1; // Trials per level
 	const int TOTAL_TRIALS = SIZES.size() * DENSITIES.size() * TRIALS_PER_LEVEL;
 	const string INPUT_FORMAT = "cols";
+	const bool WRITE_INPUT = true;
+
 	cerr << "Running SCP" << endl;
 	cerr << endl;
 	cerr << "Sizes (" << SIZES.size() << "): ";
@@ -75,6 +77,7 @@ int main () {
 	cerr << "Input format: " << INPUT_FORMAT << endl;
 	cerr << "Input directory: " << INPUT_DIRECTORY << endl;
 	cerr << "Output directory: " << OUTPUT_DIRECTORY << endl;
+	cerr << "Input writing is " << (WRITE_INPUT ? "on" : "off") << endl;
 	cerr << endl;
 
 	auto startTime = chrono::system_clock::now();
@@ -100,8 +103,10 @@ int main () {
 					density,
 					trial
 				);
-				cerr << "\tWriting input file..." << endl;
-				writeSCPinstance(input, INPUT_FORMAT, INPUT_DIRECTORY + dataSetName + ".txt");
+				if (WRITE_INPUT) {
+					cerr << "\tWriting input file..." << endl;
+					writeSCPinstance(input, INPUT_FORMAT, INPUT_DIRECTORY + dataSetName + ".txt");
+				}
 				vector<string> algorithms = {
 					"NG",
 					"OG"

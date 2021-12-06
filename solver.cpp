@@ -78,7 +78,7 @@ SCPsolution* solveSCPinstance (SCPinstance* input, string algo) {
 		/*
 		Unoptimized, naive greedy
 
-		On each iteration, check all sets to select the one with least unit cost
+		On each iteration, run through all elements of all sets to recompute unit costs and select the one with least unit cost
 		
 		O(n∑|S|) time, where the summation iterates over all sets S in the problem description
 		or

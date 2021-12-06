@@ -1,4 +1,4 @@
 Number of sets: 5
 Total cost: 5
 305 336 389 464 858 
-0.000491 s
+0.000347 s

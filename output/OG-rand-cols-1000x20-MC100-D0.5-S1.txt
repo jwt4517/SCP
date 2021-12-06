@@ -1,0 +1,4 @@
+Number of sets: 10
+Total cost: 230
+1 5 9 10 11 16 17 18 19 20 
+3.9e-05 s

@@ -1,239 +1,265 @@
-const double INF_DOUBLE = 1e18;
+/**
+ * @file solver.cpp
+ * @brief This file contains functions for reading SCP input files, solving SCP
+ * instances with various algorithms, and writing SCP solutions to output files.
+ */
+const double kDoubleInfinity = 1e18;
 
 /**
- * Reads an SCP instance in format `inputFormat` from `inputPath`
+ * @brief Reads an SCP instance from an input file and converts it to a
+ * SCPinstance object
  * 
- * `string inputPath`: The path to the instance
- * `string inputFormat`: The format of the instance (either `rows` or `cols`, as specified for the OR-Library Data Sets)
+ * @param input_path The path to the instance
+ * @param input_format The format of the instance (either `rows` or `columns`,
+ * as specified for the OR-Library Data Sets)
+ * @return ScpInstance*
  */
-SCPinstance* readSCPinstance (string inputPath, string inputFormat) {
-	freopen(inputPath.c_str(), "r", stdin);
+ScpInstance* readScpInstance (string input_path, string input_format) {
+	freopen(input_path.c_str(), "r", stdin);
 	int N, M;
 	cin >> N >> M;
-	SCPinstance* res = new SCPinstance(N, M);
-	if (inputFormat == "rows") {
-		for (int &x: res->costs) cin >> x;
+	ScpInstance* instance = new ScpInstance(N, M);
+	if (input_format == "rows") {
+		for (int &x: instance->costs) cin >> x;
 		for (int r = 0; r < N; r++) {
-			int numCols;
-			cin >> numCols;
-			while (numCols--) {
+			int column_count;
+			cin >> column_count;
+			while (column_count--) {
 				int c;
 				cin >> c;
 				c--;
-				res->rows[r].push_back(c), res->cols[c].push_back(r);
+				instance->rows[r].push_back(c);
+				instance->columns[c].push_back(r);
 			}
 		}
 	} else {
 		for (int c = 0; c < M; c++) {
-			cin >> res->costs[c];
-			int numRows;
-			cin >> numRows;
-			while (numRows--) {
+			cin >> instance->costs[c];
+			int row_count;
+			cin >> row_count;
+			while (row_count--) {
 				int r;
 				cin >> r;
 				r--;
-				res->rows[r].push_back(c), res->cols[c].push_back(r);
+				instance->rows[r].push_back(c);
+				instance->columns[c].push_back(r);
 			}
 		}
 	}
-	return res;
+	return instance;
 }
 
 /**
- * Solves or approximates a SCP instance using an algorithm or heuristic, producing a SCP solution.
+ * @brief Solves or approximates a SCP instance using an algorithm or heuristic
+ * producing a SCP solution.
  * 
- * `SCPinstance* input`: The SCP instance to solve
- * `string algo`: The algorithm to use
+ * @param input The SCP instance to solve
+ * @param algorithm The algorithm to use
+ * @return ScpSolution* 
  */
-SCPsolution* solveSCPinstance (SCPinstance* input, string algo) {
+ScpSolution* solveScpInstance (ScpInstance* input, string algorithm) {
 	int N = input->n, M = input->m;
 	vector<int> costs = input->costs;
-	vector<vector<int>> rows = input->rows, cols = input->cols;
-	SCPsolution* res = new SCPsolution();
+	vector<vector<int>> rows = input->rows, columns = input->columns;
+	ScpSolution* solution = new ScpSolution();
 
-	// Determine if a solution exists (O(∑|S_i|))
-	vector<bool> exists(N); // exists[i] holds whether i exists in any input set
-	for (vector<int> col: cols) {
-		for (int r: col) exists[r] = true;
+	// Checks that a solution exists in O(∑|S_i|)
+	vector<bool> exists(N); // exists[i] holds whether i exists in any column
+	for (vector<int> column: columns) {
+		for (int r: column) exists[r] = true;
 	}
 	for (int c = 0; c < N; c++) {
 		if (!exists[c]) {
 			cerr << "Error: No set contains element " << c + 1 << endl;
-			return res;
+			return solution;
 		}
 	}
 
-	auto startTime = chrono::system_clock::now(); 
+	auto start_time = chrono::system_clock::now(); 
 
-	// colSizes[i] holds the number of uncovered elements remaining in column i
-	vector<int> colSizes; // Gets updated and used in the greedy algos
-	for (vector<int> col: cols) colSizes.push_back(col.size());
-	// selected is the subfamily of sets selected for the answer
-	vector<bool> inUnion(N); // inUnion[r] holds whether r is in the union of all selected sets
-	int unionSize = 0;
-	vector<double> unitCosts(M, INF_DOUBLE);
-	int bestC = 0; // Index of the column with the lowest unit cost
+	/*
+	 * column_sizes[i] holds the number of uncovered elements remaining in
+	 * column i
+	 */
+	vector<int> column_sizes; // Gets updated and used in the greedy algos
+	for (vector<int> column: columns) column_sizes.push_back(column.size());
+	// in_union[r] holds whether r is in the union of all selected sets
+	vector<bool> in_union(N);
+	int union_size = 0;
+	vector<double> unit_costs(M, kDoubleInfinity);
+	int best_c = 0; // Index of the best column (lowest unit cost)
 
-	if (algo == "NG") {
-		/*
-		Unoptimized, naive greedy
-
-		On each iteration, run through all elements of all sets to recompute unit costs and select the one with least unit cost
-		
-		O(n∑|S|) time, where the summation iterates over all sets S in the problem description
-		or
-		O(n^2m) time
-
-		O(nm) mem
-		*/
-
-		while (unionSize < N) {
+	if (algorithm == "NG") {
+		/**
+		 * @brief Unoptimized, naive greedy
+		 * 
+		 * On each iteration, the algorithm runs through all elements of all
+		 * sets to recompute unit costs and select the one with least unit cost.
+		 * 
+		 * O(n∑|S|) time, where the summation iterates over all sets S in the
+		 * problem description
+		 * or
+		 * O(mn^2) time
+		 * 
+		 * O(mn) memory
+		 */
+		while (union_size < N) {
 			for (int c = 0; c < M; c++) {
-				colSizes[c] = 0;
-				for (int r: cols[c]) {
-					if (!inUnion[r]) colSizes[c]++;
+				column_sizes[c] = 0;
+				for (int r: columns[c]) {
+					if (!in_union[r]) column_sizes[c]++;
 				}
-				unitCosts[c] = colSizes[c] ? double(costs[c]) / colSizes[c] : INF_DOUBLE;
+				unit_costs[c] = column_sizes[c] ?
+					double(costs[c]) / column_sizes[c] : kDoubleInfinity;
 			}
 			for (int c = 0; c < M; c++) {
-				if (unitCosts[c] < unitCosts[bestC]) bestC = c;
+				if (unit_costs[c] < unit_costs[best_c]) best_c = c;
 			}
-			res->selected.push_back(bestC);
-			for (int r: cols[bestC]) {
-				if (!inUnion[r]) {
-					inUnion[r] = true;
-					unionSize++;
+			solution->selected.push_back(best_c);
+			for (int r: columns[best_c]) {
+				if (!in_union[r]) {
+					in_union[r] = true;
+					union_size++;
 				}
 			}
-			res->totalCost += costs[bestC];
+			solution->total_cost += costs[best_c];
 		}
-	} else if (algo == "OG") {
-		/*
-		Optimized greedy
-
-		Optimize naive greedy using the observation that only the rows containing the new elements selected in each
-		iteration must be updated.
-
-		O(∑|S|) time, where the summation iterates over all sets S in the problem description
-		or
-		O(mn) time
-
-		O(mn) mem
-		*/
+	} else if (algorithm == "OG") {
+		/**
+		 * @brief Optimized greedy
+		 * 
+		 * Optimizes naive greedy using the observation that only the rows
+		 * containing the new elements selected in each iteration must be
+		 * updated.
+		 * 
+		 * O(∑|S_i|) time, where the summation iterates over all sets S in the
+		 * problem description
+		 * or
+		 * O(mn) time
+		 * 
+		 * O(mn) memory
+		 */
 		for (int c = 0; c < M; c++) {
-			if (colSizes[c]) unitCosts[c] = double(costs[c]) / colSizes[c];
-			if (unitCosts[c] < unitCosts[bestC]) bestC = c;
+			if (column_sizes[c])
+				unit_costs[c] = double(costs[c]) / column_sizes[c];
+			if (unit_costs[c] < unit_costs[best_c]) best_c = c;
 		}
-		while (unionSize < N) {
+		while (union_size < N) {
 			for (int c = 0; c < M; c++) {
-				if (unitCosts[c] < unitCosts[bestC]) bestC = c;
+				if (unit_costs[c] < unit_costs[best_c]) best_c = c;
 			}
-			res->selected.push_back(bestC);
-			res->totalCost += costs[bestC];
-			for (int r: cols[bestC]) {
-				if (!inUnion[r]) {
-					for (int c: rows[r]) {
-						colSizes[c]--;
-						unitCosts[c] = colSizes[c] ? double(costs[c]) / colSizes[c] : INF_DOUBLE;
-					}
-					inUnion[r] = true;
-					unionSize++;
+			solution->selected.push_back(best_c);
+			solution->total_cost += costs[best_c];
+			for (int r: columns[best_c]) {
+				// Performs updates on all newly-covered elements
+				if (in_union[r]) continue;
+				for (int c: rows[r]) {
+					column_sizes[c]--;
+					unit_costs[c] = column_sizes[c] ?
+						double(costs[c]) / column_sizes[c] : kDoubleInfinity;
 				}
+				in_union[r] = true;
+				union_size++;
 			}
 		}
-	} else if (algo == "2M") {
-		/*
-			2^m exact
-			
-			Brute-force all 2^m subfamilies of S to check if their union equals U.
-
-			Requires 2^m <= LLONG_MAX, equivalent to m < 63
-
-			O(2^m * mn) time
-			O(mn) mem
-		*/
-		res->totalCost = LLONG_MAX;
+	} else if (algorithm == "2ME") {
+		/**
+		 * @brief 2^m exact
+		 * 
+		 * Brute-forces all 2^m subfamilies of S to check if their union is U.
+		 * 
+		 * Requires 2^m <= LLONG_MAX, equivalent to m < 63
+		 * 
+		 * O(2^m * mn) time
+		 * O(mn) memory
+		 */
+		solution->total_cost = LLONG_MAX;
 		// x is a bitmask encoding the sets in the subfamily
 		// The c-th bit from the end of x encodes S_c
 		for (long long x = 0; x < (1LL << M); x++) {
-			inUnion = vector<bool>(N);
-			long long nxtTotal = 0;
-			vector<int> nxtSelected;
+			in_union = vector<bool>(N);
+			long long next_total = 0;
+			vector<int> next_selected;
 			for (int c = 0; c < M; c++) {
 				if ((x >> c) & 1) {
-					for (int r: cols[c]) inUnion[r] = true;
-					nxtTotal += costs[c];
-					nxtSelected.push_back(c);
+					for (int r: columns[c]) in_union[r] = true;
+					next_total += costs[c];
+					next_selected.push_back(c);
 				}
 			}
 			bool ok = true;
-			for (bool r: inUnion) ok &= r;
-			if (ok && nxtTotal < res->totalCost) {
-				res->totalCost = nxtTotal;
-				res->selected = nxtSelected;
+			for (bool r: in_union) ok &= r;
+			if (ok && next_total < solution->total_cost) {
+				solution->total_cost = next_total;
+				solution->selected = next_selected;
 			}
 		}
-	} else if (algo == "2N") {
-		/*
-			2^n exact
-
-			Use bitmask DP on the subsets of U to find the minimum total cost.
-
-			Requires 2^n <= LLONG_MAX, equivalent to n < 63
-		
-			O(2^n * m) time
-			O(2^n) mem
-		*/
-		vector<long long> dpTotal(1LL << N, 1e18); // Compute minimum total costs for each subset of U by DP
-		dpTotal[0] = 0;
-		vector<string> dpSubf(1LL << N); // Also store the corresponding subfamilies of S used, as bitmasks
-		string emptySubf;
-		for (int c = 0; c < M; c++) emptySubf += '0';
-		for (string &x: dpSubf) x = emptySubf;
+	} else if (algorithm == "2NE") {
+		/**
+		 * @brief 2^n exact
+		 * 
+		 * Use bitmask DP on the subsets of U to find the minimum total cost.
+		 * 
+		 * Requires 2^n <= LLONG_MAX, equivalent to n < 63
+		 * 
+		 * O(2^n * m) time
+		 * O(2^n) mem
+		 */
+		// Stores minimum total costs for each subset of U by DP
+		vector<long long> dp_totals(1LL << N, 1e18);
+		dp_totals[0] = 0;
+		// Stores the corresponding subfamilies of S used, as bitmask strings
+		vector<string> dp_subfamilies(1LL << N);
+		string empty_subfamily;
+		for (int c = 0; c < M; c++) empty_subfamily += '0';
+		for (string &x: dp_subfamilies) x = empty_subfamily;
 		// x is a bitmask encoding the elements in the subset of U
 		// The r-th bit from the end of x encodes element r
 		for (long long x = 0; x < (1LL << N); x++) {
 			for (int c = 0; c < M; c++) {
-				long long setDiff = x; // Set difference: (subset encoded by x) - S_c
-				for (int r: cols[c]) setDiff &= ~(1 << r);
-				long long nxtTotal = dpTotal[setDiff] + costs[c];
-				if (nxtTotal < dpTotal[x]) {
-					dpTotal[x] = nxtTotal;
-					dpSubf[x] = dpSubf[setDiff];
-					dpSubf[x][c] = '1';
+				// Set difference: (subset encoded by x) - S_c
+				long long set_difference = x;
+				for (int r: columns[c]) set_difference &= ~(1 << r);
+				long long next_total = dp_totals[set_difference] + costs[c];
+				if (next_total < dp_totals[x]) {
+					dp_totals[x] = next_total;
+					dp_subfamilies[x] = dp_subfamilies[set_difference];
+					dp_subfamilies[x][c] = '1';
 				}
 			}
 		}
-		long long lastIdx = (1LL << N) - 1;
-		res->totalCost = dpTotal[lastIdx];
+		solution->total_cost = dp_totals.back();
 		for (int c = 0; c < M; c++) {
-			if (dpSubf[lastIdx][c] == '1') res->selected.push_back(c);
+			if (dp_subfamilies.back()[c] == '1')
+				solution->selected.push_back(c);
 		}
 	} else {
-		cerr << "Error: Unsupported algorithm \"" << algo << "\"" << endl;
-		return res;
+		cerr << "Error: Unsupported algorithm \"" << algorithm << "\"" << endl;
+		return solution;
 	}
 	
-	auto endTime = chrono::system_clock::now();
-	chrono::duration<double> elapsed = endTime - startTime;
-	res->runtime = elapsed.count();
+	auto end_time = chrono::system_clock::now();
+	chrono::duration<double> elapsed = end_time - start_time;
+	solution->runtime = elapsed.count();
 
-	for (int &c: res->selected) c++;
-	sort(res->selected.begin(), res->selected.end()); // Sort sets for presentation
-	return res;
+	for (int &c: solution->selected) c++;
+	// Sort sets for presentation
+	sort(solution->selected.begin(), solution->selected.end());
+	return solution;
 }
 
 /**
- * Writes a SCP solution to an output file
+ * @brief Writes a SCP solution to an output file
  * 
- * `SCPsolution* output`: The SCP solution to write
- * `string outputPath`: The path to the output file
+ * @param solution The SCP solution to write
+ * @param output_path The path to the output file
  */
-void writeSCPsolution (SCPsolution* output, string outputPath) {
-	freopen(outputPath.c_str(), "w", stdout);
-	cout << "Number of sets: " << output->selected.size() << endl;
-	cout << "Total cost: " << output->totalCost << endl;
-	for (int c: output->selected) cout << c << ' ';
+void writeScpSolution (ScpSolution* solution, string output_path) {
+	freopen(output_path.c_str(), "w", stdout);
+	cout << "Number of sets: " << solution->selected.size() << endl;
+	cout << "Total cost: " << solution->total_cost << endl;
+	cout << "Sets selected: " << endl;
+	for (int c: solution->selected) cout << c << ' ';
 	cout << endl;
-	cout << output->runtime << " s" << endl;
+	cout << "Runtime: " << solution->runtime << " s" << endl;
 }

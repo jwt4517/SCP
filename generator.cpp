@@ -1,63 +1,82 @@
 /**
- * Generates a random SCP instance (input data set)
- * 
- * `int n`: The number of rows/elements
- * `int m`: The number of columns/sets
- * `int mx_cost`: The maximum cost assigned to a set (all costs are integers selected uniformly at random from `[1, mx_cost]`)
- * `double density`: The approximately density of cells in the matrix, or the probability that any given cell will be filled (each row is guaranteed to have at least one cell.)
- * `int seed`: The seed used for calibrating randomization
+ * @file generator.cpp
+ * @brief This file contains functions for generating random SCP instances with
+ * various settings and writing them to input files.
  */
-SCPinstance* generateSCPinstance (int n, int m, int mx_cost, double density, int seed) {
+
+/**
+ * @brief Generates a random SCP instance (input data set).
+ * 
+ * @param n The number of rows/elements
+ * @param m The number of columns/sets
+ * @param max_cost The maximum cost assigned to a set (all costs are integers
+ * selected uniformly at random from `[1, max_cost]`)
+ * @param density The approximate density of cells in the matrix, or the
+ * probability that any given cell will be filled (each row is guaranteed to
+ * have at least one cell.)
+ * @param seed The seed used for calibrating randomization
+ * @return ScpInstance* 
+ */
+ScpInstance* generateScpInstance (int n, int m, int max_cost, double density,
+	int seed) {
 	srand(seed);
 
-	SCPinstance* res = new SCPinstance(n, m);
+	ScpInstance* instance = new ScpInstance(n, m);
 
-	for (int &x: res->costs) x = rand() % mx_cost + 1;
+	for (int &x: instance->costs) x = rand() % max_cost + 1;
 
 	for (int r = 0; r < n; r++) {
 		for (int c = 0; c < m; c++) {
-			if (rand() < density * RAND_MAX) res->rows[r].push_back(c), res->cols[c].push_back(r);
+			if (rand() < density * RAND_MAX) {
+				instance->rows[r].push_back(c);
+				instance->columns[c].push_back(r);
+			}
 		}
-		if (res->rows[r].empty()) {
-			int randC = rand() % m; // Ensure the row is non-empty by selecting a random column
-			res->rows[r].push_back(randC), res->cols[randC].push_back(r);
+		if (instance->rows[r].empty()) {
+			// Ensure the row is non-empty by selecting a random column
+			int random_c = rand() % m;
+			instance->rows[r].push_back(random_c);
+			instance->columns[random_c].push_back(r);
 		}
 	}
 
-	return res;
+	return instance;
 }
 
 /**
- * Writes a SCP instance to an input file
+ * @brief Writes a SCP instance to an input file
  * 
- * `SCPinstance* input`: The instance to write
- * `string inputFormat`: The format of the instance (either `rows` or `cols`, as specified for the OR-Library Data Sets)
- * `string inputPath`: The path to write the instance to
+ * @param input The instance to write
+ * @param input_format The format of the instance (either `rows` or `columns`,
+ * as specified for the OR-Library Data Sets)
+ * @param input_path The path to write the instance to
  */
-void writeSCPinstance (SCPinstance* input, string inputFormat, string inputPath) {
-	freopen(inputPath.c_str(), "w", stdout);
+void writeScpInstance (ScpInstance* input, string input_format,
+	string input_path) {
+	freopen(input_path.c_str(), "w", stdout);
 	cout << input->n << ' ' << input->m << endl;
-	// Generate following the OR-lib "rows" setting such that all rows are covered
-	if (inputFormat == "rows") {
+	// Generate with OR-Library "rows" setting such that all rows are covered
+	if (input_format == "rows") {
 		// costs
 		for (int x: input->costs) cout << x << ' ';
 		cout << endl;
-		// N * ([# cols in row] col_1 ... col_last)
+		// N * ([# of columns in row] column_1 ... column_last)
 		for (vector<int> row: input->rows) {
 			cout << row.size() << endl;
 			for (int c: row) cout << c + 1 << ' ';
 			cout << endl;
 		}
-	// Generate following the OR-lib "cols" setting
-	} else if (inputFormat == "cols") {
-		// M * ([column cost] [# rows in col] row_1 ... row_last)
+	// Generate with OR-Library "columns" setting such that all rows are covered
+	} else if (input_format == "columns") {
+		// M * ([column cost] [# rows in column] row_1 ... row_last)
 		for (int c = 0; c < input->m; c++) {
-			cout << input->costs[c] << ' ' << input->cols[c].size();
-			for (int r: input->cols[c]) cout << ' ' << r + 1;
+			cout << input->costs[c] << ' ' << input->columns[c].size();
+			for (int r: input->columns[c]) cout << ' ' << r + 1;
 			cout << endl;
 		}
 	} else {
-		cerr << "Error: Unsupported input format \"" << inputFormat << "\"" << endl;
+		cerr << "Error: Unsupported input format \"" << input_format << "\"" <<
+			endl;
 		return;
 	}
 }

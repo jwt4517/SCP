@@ -1,4 +1,0 @@
-Number of sets: 7
-Total cost: 7
-63 152 249 256 305 646 972 
-0.008559 s

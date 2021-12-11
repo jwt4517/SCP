@@ -1,4 +1,0 @@
-Number of sets: 3
-Total cost: 3
-63 90 403 
-0.000188 s

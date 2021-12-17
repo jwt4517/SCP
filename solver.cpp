@@ -14,19 +14,27 @@ const double kDoubleInfinity = 1e18;
  * as specified for the OR-Library Data Sets)
  * @return ScpInstance*
  */
-ScpInstance* readScpInstance (string input_path, string input_format) {
-	freopen(input_path.c_str(), "r", stdin);
+unique_ptr<ScpInstance> readScpInstance (
+	string input_path, string input_format, ofstream &log_file
+) {
+	ifstream fin(input_path);
+	if (fin.bad()) {
+		log_file << currentTimeMargin() << "An error occurred when reading " <<
+			input_path << ".\n";
+		fin.close();
+		return unique_ptr<ScpInstance>();
+	}
 	int N, M;
-	cin >> N >> M;
-	ScpInstance* instance = new ScpInstance(N, M);
+	fin >> N >> M;
+	unique_ptr<ScpInstance> instance(new ScpInstance(N, M));
 	if (input_format == "rows") {
-		for (int &x: instance->costs) cin >> x;
+		for (int &x: instance->costs) fin >> x;
 		for (int r = 0; r < N; r++) {
 			int column_count;
-			cin >> column_count;
+			fin >> column_count;
 			while (column_count--) {
 				int c;
-				cin >> c;
+				fin >> c;
 				c--;
 				instance->rows[r].push_back(c);
 				instance->columns[c].push_back(r);
@@ -34,18 +42,19 @@ ScpInstance* readScpInstance (string input_path, string input_format) {
 		}
 	} else {
 		for (int c = 0; c < M; c++) {
-			cin >> instance->costs[c];
+			fin >> instance->costs[c];
 			int row_count;
-			cin >> row_count;
+			fin >> row_count;
 			while (row_count--) {
 				int r;
-				cin >> r;
+				fin >> r;
 				r--;
 				instance->rows[r].push_back(c);
 				instance->columns[c].push_back(r);
 			}
 		}
 	}
+	fin.close();
 	return instance;
 }
 
@@ -57,11 +66,13 @@ ScpInstance* readScpInstance (string input_path, string input_format) {
  * @param algorithm The algorithm to use
  * @return ScpSolution* 
  */
-ScpSolution* solveScpInstance (ScpInstance* input, string algorithm) {
+unique_ptr<ScpSolution> solveScpInstance (
+	unique_ptr<ScpInstance> &input, string algorithm, ofstream &log_file
+) {
 	int N = input->n, M = input->m;
 	vector<int> costs = input->costs;
 	vector<vector<int>> rows = input->rows, columns = input->columns;
-	ScpSolution* solution = new ScpSolution();
+	unique_ptr<ScpSolution> solution(new ScpSolution());
 
 	// Checks that a solution exists in O(∑|S_i|)
 	vector<bool> exists(N); // exists[i] holds whether i exists in any column
@@ -70,12 +81,13 @@ ScpSolution* solveScpInstance (ScpInstance* input, string algorithm) {
 	}
 	for (int c = 0; c < N; c++) {
 		if (!exists[c]) {
-			cerr << "Error: No set contains element " << c + 1 << endl;
+			log_file << currentTimeMargin() << 
+				"Error: No set contains element " << c + 1 << '\n';
 			return solution;
 		}
 	}
 
-	auto start_time = chrono::system_clock::now(); 
+	auto start_time = system_clock::now(); 
 
 	/*
 	 * column_sizes[i] holds the number of uncovered elements remaining in
@@ -139,15 +151,12 @@ ScpSolution* solveScpInstance (ScpInstance* input, string algorithm) {
 		 * 
 		 * O(mn) memory
 		 */
-		for (int c = 0; c < M; c++) {
+		for (int c = 0; c < M; c++)
 			if (column_sizes[c])
 				unit_costs[c] = double(costs[c]) / column_sizes[c];
-			if (unit_costs[c] < unit_costs[best_c]) best_c = c;
-		}
 		while (union_size < N) {
-			for (int c = 0; c < M; c++) {
+			for (int c = 0; c < M; c++)
 				if (unit_costs[c] < unit_costs[best_c]) best_c = c;
-			}
 			solution->selected.push_back(best_c);
 			solution->total_cost += costs[best_c];
 			for (int r: columns[best_c]) {
@@ -218,12 +227,12 @@ ScpSolution* solveScpInstance (ScpInstance* input, string algorithm) {
 		for (long long x = 0; x < (1LL << N); x++) {
 			for (int c = 0; c < M; c++) {
 				// Set difference: (subset encoded by x) - S_c
-				long long set_difference = x;
-				for (int r: columns[c]) set_difference &= ~(1 << r);
-				long long next_total = dp_totals[set_difference] + costs[c];
+				long long previous_subset = x;
+				for (int r: columns[c]) previous_subset &= ~(1 << r);
+				long long next_total = dp_totals[previous_subset] + costs[c];
 				if (next_total < dp_totals[x]) {
 					dp_totals[x] = next_total;
-					dp_subfamilies[x] = dp_subfamilies[set_difference];
+					dp_subfamilies[x] = dp_subfamilies[previous_subset];
 					dp_subfamilies[x][c] = '1';
 				}
 			}
@@ -234,12 +243,13 @@ ScpSolution* solveScpInstance (ScpInstance* input, string algorithm) {
 				solution->selected.push_back(c);
 		}
 	} else {
-		cerr << "Error: Unsupported algorithm \"" << algorithm << "\"" << endl;
+		log_file << currentTimeMargin() << "Error: Unsupported algorithm \"" <<
+			algorithm << "\"\n";
 		return solution;
 	}
 	
-	auto end_time = chrono::system_clock::now();
-	chrono::duration<double> elapsed = end_time - start_time;
+	auto end_time = system_clock::now();
+	duration<double> elapsed = end_time - start_time;
 	solution->runtime = elapsed.count();
 
 	for (int &c: solution->selected) c++;
@@ -254,12 +264,13 @@ ScpSolution* solveScpInstance (ScpInstance* input, string algorithm) {
  * @param solution The SCP solution to write
  * @param output_path The path to the output file
  */
-void writeScpSolution (ScpSolution* solution, string output_path) {
-	freopen(output_path.c_str(), "w", stdout);
-	cout << "Number of sets: " << solution->selected.size() << endl;
-	cout << "Total cost: " << solution->total_cost << endl;
-	cout << "Sets selected: " << endl;
-	for (int c: solution->selected) cout << c << ' ';
-	cout << endl;
-	cout << "Runtime: " << solution->runtime << " s" << endl;
+void writeScpSolution (unique_ptr<ScpSolution> &solution, string output_path) {
+	ofstream fout(output_path);
+	fout << "Number of sets: " << solution->selected.size() << '\n';
+	fout << "Total cost: " << solution->total_cost << '\n';
+	fout << "Sets selected:\n";
+	for (int c: solution->selected) fout << c << ' ';
+	fout << '\n';
+	fout << "Runtime (s): " << solution->runtime << '\n';
+	fout.close();
 }

@@ -17,11 +17,12 @@
  * @param seed The seed used for calibrating randomization
  * @return ScpInstance* 
  */
-ScpInstance* generateScpInstance (int n, int m, int max_cost, double density,
-	int seed) {
+unique_ptr<ScpInstance> generateScpInstance (
+	int n, int m, int max_cost, double density, int seed
+) {
 	srand(seed);
 
-	ScpInstance* instance = new ScpInstance(n, m);
+	unique_ptr<ScpInstance> instance(new ScpInstance(n, m));
 
 	for (int &x: instance->costs) x = rand() % max_cost + 1;
 
@@ -51,32 +52,35 @@ ScpInstance* generateScpInstance (int n, int m, int max_cost, double density,
  * as specified for the OR-Library Data Sets)
  * @param input_path The path to write the instance to
  */
-void writeScpInstance (ScpInstance* input, string input_format,
-	string input_path) {
-	freopen(input_path.c_str(), "w", stdout);
-	cout << input->n << ' ' << input->m << endl;
+void writeScpInstance (
+	unique_ptr<ScpInstance> &input, string input_format, string input_path
+) {
+	ofstream fout;
+	fout.open(input_path);
+	fout << input->n << ' ' << input->m << '\n';
 	// Generate with OR-Library "rows" setting such that all rows are covered
 	if (input_format == "rows") {
 		// costs
-		for (int x: input->costs) cout << x << ' ';
-		cout << endl;
+		for (int x: input->costs) fout << x << ' ';
+		fout << '\n';
 		// N * ([# of columns in row] column_1 ... column_last)
 		for (vector<int> row: input->rows) {
-			cout << row.size() << endl;
-			for (int c: row) cout << c + 1 << ' ';
-			cout << endl;
+			fout << row.size() << '\n';
+			for (int c: row) fout << c + 1 << ' ';
+			fout << '\n';
 		}
 	// Generate with OR-Library "columns" setting such that all rows are covered
 	} else if (input_format == "columns") {
 		// M * ([column cost] [# rows in column] row_1 ... row_last)
 		for (int c = 0; c < input->m; c++) {
-			cout << input->costs[c] << ' ' << input->columns[c].size();
-			for (int r: input->columns[c]) cout << ' ' << r + 1;
-			cout << endl;
+			fout << input->costs[c] << ' ' << input->columns[c].size();
+			for (int r: input->columns[c]) fout << ' ' << r + 1;
+			fout << '\n';
 		}
 	} else {
-		cerr << "Error: Unsupported input format \"" << input_format << "\"" <<
-			endl;
+		fout << "Error: Unsupported input format \"" << input_format << "\"\n";
+		fout.close();
 		return;
 	}
+	fout.close();
 }

@@ -123,8 +123,7 @@ int main () {
 	for (int i = 0; i < kSizes.size(); i++) {
 		pair<int, int> size = kSizes[i];
 		int n = size.first, m = size.second;
-		string size_string = to_string(n) + 'x' + to_string(m);
-		size_string.replace(size_string.find('x'), 1, "×");
+		string size_string = to_string(n) + " × " + to_string(m);
 		log_file << currentTimeMargin() << "[Size " << i + 1 << '/' <<
 			kSizes.size() << "] " << size_string << endl;
 		// Finds all algorithms that are feasible to run on this matrix size

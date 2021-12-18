@@ -10,8 +10,8 @@ The repository implements the following algorithms/heuristics:
 |-|-|
 |NG|Naive-greedy|
 |OG|Optimized-greedy|
-|2ME|2ᵐ-exact|
-|2NE|2ⁿ-exact|
+|2ME|2*ᵐ*-exact|
+|2NE|2*ⁿ*-exact|
 
 Documentation in `solveScpInstance` supplies further descriptions on these algorithms.
 

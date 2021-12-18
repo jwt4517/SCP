@@ -77,7 +77,7 @@ const vector<double> kDensities = {
 };
 const int kMaxCost = 1000;
 // Number of repetitions run per experimental condition
-const int kTrialsPerCondition = 1;
+const int kTrialsPerCondition = 5;
 const int kTotalTrials = kSizes.size() * kDensities.size() *
 	kTrialsPerCondition;
 const bool kWriteInput = false;

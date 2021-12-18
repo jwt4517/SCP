@@ -1,4 +1,4 @@
-**<h1 style="text-align: center;">SCP Data Collector</h1>**
+# <h1 align="center">SCP Data Collector</h1>
 
 # About
 I wrote this code, chiefly comprising C++ algorithms, to collect my own data for my Senior Research Project (SRP) on the [set cover problem (SCP)](https://en.wikipedia.org/wiki/Set_cover_problem), "Heuristics of the Set Cover Problem". The data provide insight on the accuracy, runtime, and feasibility of various exact algorithms and approximation heuristics.

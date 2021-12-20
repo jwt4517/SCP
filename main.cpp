@@ -97,7 +97,7 @@ int main () {
 	log_file << currentTimeMargin() << endl;
 	log_file << currentTimeMargin() << "Sizes (" << kSizes.size() << "): ";
 	for (pair<int, int> size: kSizes)
-		log_file << size.first << 'x' << size.second << ' ';
+		log_file << size.first << " × " << size.second << ' ';
 	log_file << endl;
 	log_file << currentTimeMargin() << "Densities (" << kDensities.size() <<
 		"): ";
@@ -123,9 +123,13 @@ int main () {
 	for (int i = 0; i < kSizes.size(); i++) {
 		pair<int, int> size = kSizes[i];
 		int n = size.first, m = size.second;
-		string size_string = to_string(n) + " × " + to_string(m);
+		const string size_string = to_string(n) + "x" + to_string(m);
+		string size_string_formatted = size_string;
+		size_string_formatted.replace(
+			size_string_formatted.find('x'), 1, " × "
+		);
 		log_file << currentTimeMargin() << "[Size " << i + 1 << '/' <<
-			kSizes.size() << "] " << size_string << endl;
+			kSizes.size() << "] " << size_string_formatted << endl;
 		// Finds all algorithms that are feasible to run on this matrix size
 		vector<string> size_algorithm_ids = {
 			"NG",
@@ -143,8 +147,8 @@ int main () {
 			double density = kDensities[j];
 			log_file << currentTimeMargin() << "  [Experimental condition " <<
 				condition_count + 1 << '/' <<
-				kSizes.size() * kDensities.size() << "] " << size_string <<
-				", " << density << " density" << endl;
+				kSizes.size() * kDensities.size() << "] " <<
+				size_string_formatted << ", " << density << " density" << endl;
 			map<string, unique_ptr<AlgorithmDataCollection>> data_collections;
 			for (string algorithm_id: size_algorithm_ids) {
 				unique_ptr<AlgorithmDataCollection> collection(
@@ -156,12 +160,12 @@ int main () {
 				trial++, trial_count++) {
 				log_file << currentTimeMargin() << "    [Trial " <<
 					trial_count + 1 << '/' << kTotalTrials << "]";
-				log_file << ' ' << size_string;
+				log_file << ' ' << size_string_formatted;
 				log_file << ", " << density << " density";
 				log_file << ", repetition #" << trial << '/' <<
 					kTrialsPerCondition << endl;
-				string data_set_name = "rand-" + kInputFormat + '-' +
-					size_string +
+				string data_set_name = "rand-" + kInputFormat +
+					'-' + size_string +
 					"-MC" + to_string(kMaxCost) +
 					"-D" + doubleToString(density) +
 					"-S" + to_string(trial);
@@ -218,8 +222,8 @@ int main () {
 				stats_file_name << "..." << endl;
 			ofstream fout(run_output_directory + stats_file_name);
 			fout << kAlgorithmStats.at(stat_id) << ' ' << kTrialsPerCondition <<
-				"-trial averages (" << size_string << ", max column cost " <<
-				kMaxCost << ')' << endl;
+				"-trial averages (" << size_string_formatted <<
+				", max column cost " << kMaxCost << ')' << endl;
 			vector<vector<string>> table(
 				size_algorithm_ids.size() + 1,
 				vector<string>(kDensities.size() + 1)
